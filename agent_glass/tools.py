@@ -61,3 +61,15 @@ def read_file(path):
 @tool("fetch_url", "Download a web page and return the first 2000 characters", {"url": "string"})
 def fetch_url(url):
     return requests.get(url, timeout=10).text[:2000]
+
+@tool("get_weather", "Get the current weather for a city", {"city": "string"})
+def get_weather(city):
+    geo = requests.get("https://geocoding-api.open-meteo.com/v1/search",
+                       params={"name": city, "count": 1}, timeout=10).json()
+    if not geo.get("results"):
+        raise ValueError(f"city '{city}' not found")
+    place = geo["results"][0]
+    w = requests.get("https://api.open-meteo.com/v1/forecast", params={
+        "latitude": place["latitude"], "longitude": place["longitude"],
+        "current_weather": True}, timeout=10).json()["current_weather"]
+    return f"{place['name']}: {w['temperature']} C, wind {w['windspeed']} km/h"
