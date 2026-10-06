@@ -73,3 +73,45 @@ def get_weather(city):
         "latitude": place["latitude"], "longitude": place["longitude"],
         "current_weather": True}, timeout=10).json()["current_weather"]
     return f"{place['name']}: {w['temperature']} C, wind {w['windspeed']} km/h"
+
+
+import datetime
+
+@tool("get_time", "Get the current date and time", {"timezone_note": "string"})
+def get_time(timezone_note):
+    return datetime.datetime.now().strftime("%A, %d %B %Y, %I:%M %p (local time)")
+
+@tool("list_files", "List the files in the workspace folder", {"folder": "string"})
+def list_files(folder):
+    return [p.name for p in WORKSPACE.iterdir() if p.is_file()]
+
+@tool("search_notes", "Search the workspace text files for a keyword", {"keyword": "string"})
+def search_notes(keyword):
+    hits = []
+    for p in WORKSPACE.glob("*.txt"):
+        for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+            if keyword.lower() in line.lower():
+                hits.append(f"{p.name}:{i}: {line.strip()}")
+    return hits[:10] or "no matches"
+
+@tool("write_note", "Save text to a .txt file in the workspace", {"filename": "string", "text": "string"})
+def write_note(filename, text):
+    p = (WORKSPACE / filename).resolve()
+    if p.parent != WORKSPACE or p.suffix != ".txt":
+        raise ValueError("only .txt files directly inside the workspace are allowed")
+    p.write_text(text, encoding="utf-8")
+    return f"saved {p.name}"
+
+@tool("wikipedia_summary", "Get a short Wikipedia summary of a topic", {"topic": "string"})
+def wikipedia_summary(topic):
+    r = requests.get("https://en.wikipedia.org/api/rest_v1/page/summary/" + topic.replace(" ", "_"),
+                     headers={"User-Agent": "agent-glass/1.0"}, timeout=10)
+    if r.status_code != 200:
+        raise ValueError(f"no Wikipedia page found for '{topic}'")
+    return r.json().get("extract", "")[:1500]
+
+@tool("convert_currency", "Convert an amount between currencies, e.g. 100 USD to INR",
+      {"amount": "number", "base": "string", "target": "string"})
+def convert_currency(amount, base, target):
+    rates = requests.get(f"https://open.er-api.com/v6/latest/{base.upper()}", timeout=10).json()["rates"]
+    return f"{amount} {base.upper()} = {round(amount * rates[target.upper()], 2)} {target.upper()}"
